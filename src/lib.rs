@@ -1,11 +1,9 @@
 use std::{
-    fs::{write, read_dir, File, metadata},
+    fs::{write, read_dir, File, metadata, remove_file},
     time::SystemTime,
-    io::Result,
+    io::{Result, copy},
     path::Path,
 };
-use std::fs::remove_file;
-use std::io::copy;
 
 #[derive(Debug, Clone)]
 pub enum Folders {
