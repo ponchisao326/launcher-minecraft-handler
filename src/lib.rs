@@ -1,4 +1,8 @@
-use std::time::SystemTime;
+use std::{
+    fs::write,
+    time::SystemTime,
+    io::Result
+};
 
 #[derive(Debug)]
 pub enum Folders {
@@ -108,17 +112,25 @@ impl BackUpOptions {
 
 impl BackUpData {
     /// Create new backup data
-    pub fn new(options: BackUpOptions, size_in_bytes: u64, file_count: u32) -> Self {
+    pub fn new(options: BackUpOptions, size_in_bytes: u64) -> Self {
         BackUpData {
             options,
             timestamp: SystemTime::now(),
             size_in_bytes,
-            file_count
+            file_count: 0
         }
     }
 
+    /// Create a JSON file with the backup data
+    pub fn create_json_file(&mut self) -> Result<()> {
+        let json_data = self.format_json();
+        write(self.options.destination_path.clone(), json_data)
+    }
+
     /// Format backup data as JSON string
-    pub fn format_json(&self) -> String {
+    pub fn format_json(&mut self) -> String {
+        self.count_files();
+
         format!(
             r#"{{
                 "timestamp": {:?},
@@ -139,5 +151,10 @@ impl BackUpData {
             self.options.compress,
             self.options.excluded_extensions
         )
+    }
+
+    pub fn count_files(&mut self) {
+        let files = self.options.get_all_files();
+        self.file_count = files.len() as u32;
     }
 }
