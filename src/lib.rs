@@ -89,8 +89,14 @@ impl BackUpOptions {
                 let entry = entry.unwrap();
                 let path = entry.path();
                 if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        if let Some(ext_str) = ext.to_str() {
+                            if self.excluded_extensions.contains(&ext_str.to_string()) {
+                                continue;
+                            }
+                        }
+                    }
                     let file_path = path.to_string_lossy().to_string();
-                    println!("{}", file_path); // Muestra el archivo encontrado
                     files.push(file_path);
                 }
             }
