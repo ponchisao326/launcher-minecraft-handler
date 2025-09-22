@@ -1,0 +1,4 @@
+/target
+
+# Main not necessary as it is a library so is just for debugging
+/src/main.rs
