@@ -30,7 +30,8 @@ pub struct BackUpData {
     pub options: BackUpOptions,
     pub timestamp: SystemTime,
     pub size_in_bytes: u64,
-    pub file_count: u32
+    pub file_count: u32,
+    pub json_size_in_bytes: u64
 }
 
 pub struct BackupManager;
@@ -124,7 +125,8 @@ impl BackUpData {
             options,
             timestamp: SystemTime::now(),
             size_in_bytes,
-            file_count: 0
+            file_count: 0,
+            json_size_in_bytes: 0
         }
     }
 
@@ -133,6 +135,7 @@ impl BackUpData {
         let json_data = self.format_json();
         let output_path = format!("{}/backup_data.json", self.options.destination_path); // <-- Cambiado aquí
         println!("Creating backup data file: {:?}", &output_path);
+        self.json_size_in_bytes = json_data.len() as u64;
         write(output_path, json_data)
     }
 
@@ -191,12 +194,12 @@ impl BackupManager {
         // Añade todos los archivos seleccionados
         for file_path in files.iter() {
             let path = Path::new(file_path);
-            if let Some(name) = path.file_name() {
-                let name_str = name.to_string_lossy();
-                zip.start_file(name_str, options_var).unwrap();
-                let mut f = File::open(path).unwrap();
-                copy(&mut f, &mut zip).unwrap();
-            }
+            let rel_path = path.strip_prefix(&options.default_minecraft_path)
+                .unwrap_or(path);
+            let rel_path_str = rel_path.to_string_lossy();
+            zip.start_file(rel_path_str, options_var).unwrap();
+            let mut f = File::open(path).unwrap();
+            copy(&mut f, &mut zip).unwrap();
         }
 
         // Añade el backup_data.json al zip
