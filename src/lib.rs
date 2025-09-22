@@ -75,6 +75,7 @@ impl BackUpOptions {
         self.excluded_extensions.push(extension);
     }
 
+    /// Get total size of all files in selected folders
     pub fn get_backup_size(&self) ->  u64 {
         let files = self.get_all_files();
         let mut total_size: u64 = 0;
@@ -170,6 +171,7 @@ impl BackUpData {
         )
     }
 
+    /// Count total number of files in the backup
     pub fn count_files(&mut self) {
         let files = self.options.get_all_files();
         self.file_count = files.len() as u32;
