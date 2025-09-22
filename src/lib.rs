@@ -132,7 +132,7 @@ impl BackUpData {
     /// Create a JSON file with the backup data
     pub fn create_json_file(&mut self) -> Result<()> {
         let json_data = self.format_json();
-        let output_path = format!("{}/backup_data.json", self.options.destination_path); // <-- Cambiado aquí
+        let output_path = format!("{}/backup_data.json", self.options.destination_path);
         println!("Creating backup data file: {:?}", &output_path);
         self.json_size_in_bytes = json_data.len() as u64;
         write(output_path, json_data)
