@@ -1,10 +1,13 @@
 use std::{
-    fs::write,
+    fs::{write, read_dir, File, metadata},
     time::SystemTime,
-    io::Result
+    io::Result,
+    path::Path,
 };
+use std::fs::remove_file;
+use std::io::copy;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Folders {
     Saves,
     Config,
@@ -14,6 +17,7 @@ pub enum Folders {
     Backups
 }
 
+#[derive(Clone, Debug)]
 pub struct BackUpOptions {
     pub default_minecraft_path: String,
     pub folder_options: Vec<Folders>,
@@ -23,10 +27,10 @@ pub struct BackUpOptions {
 }
 
 pub struct BackUpData {
-    options: BackUpOptions,
-    timestamp: SystemTime,
-    size_in_bytes: u64,
-    file_count: u32
+    pub options: BackUpOptions,
+    pub timestamp: SystemTime,
+    pub size_in_bytes: u64,
+    pub file_count: u32
 }
 
 pub struct BackupManager;
@@ -75,7 +79,7 @@ impl BackUpOptions {
         let mut total_size: u64 = 0;
 
         for file in files.iter() {
-            if let Ok(metadata) = std::fs::metadata(file) {
+            if let Ok(metadata) = metadata(file) {
                 total_size += metadata.len();
             }
         }
@@ -89,19 +93,22 @@ impl BackUpOptions {
         let mut files: Vec<String> = Vec::new();
 
         for folder in folders.iter() {
-            for entry in std::fs::read_dir(folder).unwrap() {
-                let entry = entry.unwrap();
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(ext) = path.extension() {
-                        if let Some(ext_str) = ext.to_str() {
-                            if self.excluded_extensions.contains(&ext_str.to_string()) {
-                                continue;
+            if let Ok(entries) = read_dir(folder) {
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        let path = entry.path();
+                        if path.is_file() {
+                            if let Some(ext) = path.extension() {
+                                if let Some(ext_str) = ext.to_str() {
+                                    if self.excluded_extensions.contains(&ext_str.to_string()) {
+                                        continue;
+                                    }
+                                }
                             }
+                            let file_path = path.to_string_lossy().to_string();
+                            files.push(file_path);
                         }
                     }
-                    let file_path = path.to_string_lossy().to_string();
-                    files.push(file_path);
                 }
             }
         }
@@ -124,16 +131,23 @@ impl BackUpData {
     /// Create a JSON file with the backup data
     pub fn create_json_file(&mut self) -> Result<()> {
         let json_data = self.format_json();
-        write(self.options.destination_path.clone(), json_data)
+        let output_path = format!("{}/backup_data.json", self.options.destination_path); // <-- Cambiado aquí
+        println!("Creating backup data file: {:?}", &output_path);
+        write(output_path, json_data)
     }
 
     /// Format backup data as JSON string
     pub fn format_json(&mut self) -> String {
         self.count_files();
 
+        let timestamp = match self.timestamp.duration_since(std::time::UNIX_EPOCH) {
+            Ok(dur) => dur.as_secs(),
+            Err(_) => 0,
+        };
+
         format!(
             r#"{{
-                "timestamp": {:?},
+                "timestamp": {},
                 "size_in_bytes": {},
                 "file_count": {},
                 "options": {{
@@ -143,7 +157,7 @@ impl BackUpData {
                     "excluded_extensions": {:?}
                 }}
             }}"#,
-            self.timestamp,
+            timestamp,
             self.size_in_bytes,
             self.file_count,
             self.options.folder_options,
@@ -156,5 +170,45 @@ impl BackUpData {
     pub fn count_files(&mut self) {
         let files = self.options.get_all_files();
         self.file_count = files.len() as u32;
+    }
+}
+
+impl BackupManager {
+    /// Create a zip backup of the selected folders
+    pub fn zip_backup(options: &BackUpOptions) {
+        let files = options.get_all_files();
+        let zip_path = if options.compress {
+            format!("{}/backup.zip", options.destination_path)
+        } else {
+            format!("{}/backup", options.destination_path)
+        };
+
+        let file = File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+
+        let options_var: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+        // Añade todos los archivos seleccionados
+        for file_path in files.iter() {
+            let path = Path::new(file_path);
+            if let Some(name) = path.file_name() {
+                let name_str = name.to_string_lossy();
+                zip.start_file(name_str, options_var).unwrap();
+                let mut f = File::open(path).unwrap();
+                copy(&mut f, &mut zip).unwrap();
+            }
+        }
+
+        // Añade el backup_data.json al zip
+        let json_path = format!("{}/backup_data.json", options.destination_path);
+        if Path::new(&json_path).exists() {
+            zip.start_file("backup_data.json", options_var).unwrap();
+            let mut f = File::open(&json_path).unwrap();
+            copy(&mut f, &mut zip).unwrap();
+            // Borrar el json después de añadirlo al zip
+            remove_file(&json_path).unwrap();
+        }
+
+        zip.finish().unwrap();
     }
 }
