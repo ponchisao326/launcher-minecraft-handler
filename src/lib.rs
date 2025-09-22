@@ -193,7 +193,7 @@ impl BackupManager {
 
         let options_var: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
-        // Añade todos los archivos seleccionados
+        // Add all selected files
         for file_path in files.iter() {
             let path = Path::new(file_path);
             let rel_path = path.strip_prefix(&options.default_minecraft_path)
@@ -204,7 +204,7 @@ impl BackupManager {
             copy(&mut f, &mut zip).unwrap();
         }
 
-        // Añade el backup_data.json al zip
+        // Add the backup_data.json to the zip
         let json_path = format!("{}/backup_data.json", options.destination_path);
         if Path::new(&json_path).exists() {
             zip.start_file("backup_data.json", options_var).unwrap();
